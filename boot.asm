@@ -1,29 +1,30 @@
-ORG 0x7c00
+ORG 0x7C00
 BITS 16
 
-boot:
-    mov bx, message
-    call prints
-    jmp $
+BOOT:
+    MOV BX, MESSAGE
+    CALL PRINTS
+    JMP $
 
-prints:
-    mov al, [bx]
-.print_loop:
-    cmp al, 0
-    je .print_complete
-    call printc
-    inc bx
-    mov al, [bx]
-    jmp .print_loop
-.print_complete:
-    ret
+PRINTS:
+    .PRINT_LOOP:
+        MOV AL, [BX]
+        CMP AL, 0
+        JE .PRINT_COMPLETE
+        CALL PRINTC
+        INC BX
+        JMP .PRINT_LOOP
 
-printc:
-    mov ah, 0eh
-    int 0x10
-    ret
+    .PRINT_COMPLETE:
+        RET
 
-message: db 'Booting system...'
+PRINTC:
+    MOV AH, 0EH
+    INT 0x10
+    RET
 
-times 510 - ($ - $$) db 0
-dw 0xAA55
+MESSAGE: DB 'Booting system...'
+
+TIMES 510 - ($ - $$) DB 0
+DW 0xAA55
+

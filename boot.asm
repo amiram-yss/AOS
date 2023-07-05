@@ -2,7 +2,14 @@
 ORG 0 ;origin 0
 BITS 16
 
-jmp 0x7c0:BOOT
+; Avoid BPV override
+_fakeBpb:
+    jmp short start; start process
+    nop ; fill place with useless info so bpb wouldn't override anything essential.
+    times 33 db 0
+
+start:
+    jmp 0x7c0:BOOT
 
 BOOT:
     CLI; Critical code here, avoiding interrupts.

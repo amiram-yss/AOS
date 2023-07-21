@@ -38,7 +38,40 @@ BOOT:
 
     ;int 0 ;INTERRUPT
     
+    ;READ FROM MEMORY
+    mov bx, MEM_MSG
+    call PRINTS
+
+    ;AH = 02h
+    mov ah, 0x02
+    ;AL = number of sectors to read (must be nonzero)
+    mov al, 1
+    ;CH = low eight bits of cylinder number
+    xor ch, ch
+    ;CL = sector number 1-63 (bits 0-5)
+    mov cl, 2
+    ;high two bits of cylinder (bits 6-7, hard disk only)
+    xor dh, dh
+    ;DH = head number
+
+    ;DL = drive number (bit 7 set for hard disk)
+    ;AUTOMATICALLY SET BY BIOS!
+
+    ;ES:BX -> data buffer
+    mov bx, DATA
+
+    int 0x13 ;Intterupt
+    jc PRINT_ERR ; If read fails, write error message.
+
+    mov bx, DATA
+    call PRINTS
+
     JMP $
+
+PRINT_ERR:
+    mov bx, MSG_MEM_ERR
+    call PRINTS
+    jmp $
 
 PRINTS:
     .PRINT_LOOP:
@@ -57,7 +90,10 @@ PRINTC:
     INT 0x10
     RET
 
-MESSAGE: DB ' AOS Booting... ',0
+MESSAGE: DB 'AOS Booting...',0dh, 0ah, 0
+MEM_MSG: DB 'Reading from memory...',0dh, 0ah, 0
+MSG_MEM_ERR: DB 'Error reading from memory.',0dh, 0ah, 0
+
 INT_MSG: DB ' int 0x0 ',0
 DBG_MSG: DB ' ! ',0
 DBG_MSG_1: DB ' 1 ',0
@@ -67,3 +103,4 @@ DBG_MSG_3: DB ' 3 ',0
 TIMES 510 - ($ - $$) DB 0
 DW 0xAA55
 
+DATA:

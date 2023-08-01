@@ -1,106 +1,80 @@
 ;ORG 0x7C00 obselete
-ORG 0 ;origin 0
+ORG 0x7c00 ;origin 0x7c00
 BITS 16
 
-; Avoid BPV override
+CODE_SEG equ gdt_code - gdt
+DATA_SEG equ gdt_data - gdt
+
+; Avoid BPB override
 _fakeBpb:
     jmp short start; start process
     nop ; fill place with useless info so bpb wouldn't override anything essential.
-    times 33 db 0
-
+times 33 db 0
+ 
 start:
-    jmp 0x7c0:BOOT
+    jmp 0x0:boot
 
-int_0x0_h: ;Interrupt 0 handler
-    mov bx, INT_MSG ;print interrupt message
-    call PRINTS
-    iret ; ret from interrupt
+boot:
+    cli; Critical code here, avoiding interrupts.
 
-BOOT:
-    CLI; Critical code here, avoiding interrupts.
-
-    mov ax, 0x00 ; overriding BIOS's STACK seg
+;mov ax, 0x00 ; overriding BIOS's STACK seg
+    xor ax, ax;     ; equiv to mov ax,0
     mov ss, ax ; stack segmentation lowest add
     mov sp, 0x7c00 ; stack pointer at the bottom of the stack
-    mov ax, 0x7c0 ;overriding BIOS's segmentations DATA, EXTRA segs
+    ;mov ax, 0x7c0 ;overriding BIOS's segmentations DATA, EXTRA segs
     mov ds, ax ;data seg at 0x7c00
     mov es, ax ;extra seg at 0x7c00Interrupt handlers
 
-    ;Interrupt handlers set
-    mov word[ss:0x0], int_0x0_h ;int 0 in ss:0h
-    mov word[ss:0x2], 0x7c0 ;TODO what is that?
-    ;End interrupt handlers initialization
+    sti; Returning interrupts. The code is no longer critical
 
-    STI; Returning interrupts. The code is no longer critical
+.enter_protected_mode:
+    cli
+    lgdt[gdt_desc]
+    mov eax, cr0
+    or  eax, 0x1
+    mov cr0, eax
 
-    MOV BX, MESSAGE
-    CALL PRINTS
+    jmp CODE_SEG:load_32
 
-    ;int 0 ;INTERRUPT
-    
-    ;READ FROM MEMORY
-    mov bx, MEM_MSG
-    call PRINTS
+; GDT init:
+; src:  https://wiki.osdev.org/GDT_Tutorial
+;       http://www.osdever.net/tutorials/view/the-world-of-protected-mode
+;       https://wiki.osdev.org/Global_Descriptor_Table#Table
+gdt:
+gdt_null:
+    dq 0x0
+; Kernel Mode Code Segment
+gdt_code:           ; CS points here
+    dw 0xffff       ; Limit 16 bits
+    dw 0x0          ; Base 16 bits
+    db 0x0          ; Base (default value)
+    db 10011010b    ; Access byte
+    db 11001111b    ; Flags
+    db 0x0          ; Base
+gdt_data:           ; DS, SS, ES, FS, GS point here
+    dw 0xffff       ; Limit 16 bits
+    dw 0x0          ; Base 16 bits
+    db 0x0          ; Base (default value)
+    db 10010010b    ; Access byte [writing access granted]
+    db 11001111b    ; Flags
+    db 0x0          ; Base
+gdt_end:
 
-    ;AH = 02h
-    mov ah, 0x02
-    ;AL = number of sectors to read (must be nonzero)
-    mov al, 1
-    ;CH = low eight bits of cylinder number
-    xor ch, ch
-    ;CL = sector number 1-63 (bits 0-5)
-    mov cl, 2
-    ;high two bits of cylinder (bits 6-7, hard disk only)
-    xor dh, dh
-    ;DH = head number
-
-    ;DL = drive number (bit 7 set for hard disk)
-    ;AUTOMATICALLY SET BY BIOS!
-
-    ;ES:BX -> data buffer
-    mov bx, DATA
-
-    int 0x13 ;Intterupt
-    jc PRINT_ERR ; If read fails, write error message.
-
-    mov bx, DATA
-    call PRINTS
-
-    JMP $
-
-PRINT_ERR:
-    mov bx, MSG_MEM_ERR
-    call PRINTS
+gdt_desc:
+    dw gdt_end - gdt ; -1?
+    dd gdt
+ 
+[BITS 32]
+load_32:
+    mov ax, DATA_SEG
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+    mov ebp, 0x00200000
+    mov esp, ebp
     jmp $
 
-PRINTS:
-    .PRINT_LOOP:
-        MOV AL, [BX]
-        CMP AL, 0
-        JE .PRINT_COMPLETE
-        CALL PRINTC
-        INC BX
-        JMP .PRINT_LOOP
-
-    .PRINT_COMPLETE:
-        RET
-
-PRINTC:
-    MOV AH, 0EH
-    INT 0x10
-    RET
-
-MESSAGE: DB 'AOS Booting...',0dh, 0ah, 0
-MEM_MSG: DB 'Reading from memory...',0dh, 0ah, 0
-MSG_MEM_ERR: DB 'Error reading from memory.',0dh, 0ah, 0
-
-INT_MSG: DB ' int 0x0 ',0
-DBG_MSG: DB ' ! ',0
-DBG_MSG_1: DB ' 1 ',0
-DBG_MSG_2: DB ' 2 ',0
-DBG_MSG_3: DB ' 3 ',0
-
-TIMES 510 - ($ - $$) DB 0
-DW 0xAA55
-
-DATA:
+times 510-($ - $$) db 0
+dw 0xAA55

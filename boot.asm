@@ -104,6 +104,6 @@ load_32:
     mov esp, ebp
     mov eax, 0xdeadbeef
     jmp $
-
+; UPDATE
 times 510-($ - $$) db 0
 dw 0xAA55

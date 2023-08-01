@@ -14,6 +14,11 @@ times 33 db 0
 start:
     jmp 0x0:boot
 
+int_0x0_h: ;Interrupt 0 handler
+    mov bx, INT_MSG ;print interrupt message
+    call PRINTS
+    iret ; ret from interrupt
+
 boot:
     cli; Critical code here, avoiding interrupts.
 
@@ -25,6 +30,11 @@ boot:
     mov ds, ax ;data seg at 0x7c00
     mov es, ax ;extra seg at 0x7c00Interrupt handlers
 
+    ;Interrupt handlers set
+    mov word[ss:0x0], int_0x0_h ;int 0 in ss:0h
+    mov word[ss:0x2], 0x7c0 ;TODO what is that?
+    ;End interrupt handlers initialization
+
     sti; Returning interrupts. The code is no longer critical
 
 .enter_protected_mode:
@@ -35,6 +45,24 @@ boot:
     mov cr0, eax
 
     jmp CODE_SEG:load_32
+
+INT_MSG: DB ' int 0x0 ',0
+PRINTS:
+    .PRINT_LOOP:
+        MOV AL, [BX]
+        CMP AL, 0
+        JE .PRINT_COMPLETE
+        CALL PRINTC
+        INC BX
+        JMP .PRINT_LOOP
+
+    .PRINT_COMPLETE:
+        RET
+
+PRINTC:
+    MOV AH, 0EH
+    INT 0x10
+    RET
 
 ; GDT init:
 ; src:  https://wiki.osdev.org/GDT_Tutorial
@@ -74,6 +102,7 @@ load_32:
     mov ss, ax
     mov ebp, 0x00200000
     mov esp, ebp
+    mov eax, 0xdeadbeef
     jmp $
 
 times 510-($ - $$) db 0

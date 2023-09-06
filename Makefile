@@ -1,4 +1,9 @@
 all:
-	nasm -f bin ./boot.asm -o ./boot.bin
-	dd if=./data.txt >> ./boot.bin
-	dd if=/dev/zero bs=512 count=1 >> ./boot.bin
+	nasm -f bin ./src/boot/boot.asm -o ./bin/boot.bin
+
+run:
+	qemu-system-x86_64 -hda ./bin/boot.bin
+
+clean:
+	rm -rf ./bin/boot.bin
+
